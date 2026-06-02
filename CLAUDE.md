@@ -58,8 +58,32 @@ The data chain is **request → reports → instances → segments → download*
 ### Sales / Finance Reports API (`downloadSalesReport` / `downloadFinanceReport`)
 - Requires `APP_STORE_CONNECT_VENDOR_NUMBER` (account-level, from Payments and Financial Reports — **not** the iTunes provider id, **not** an app Apple ID). Wrong vendor number → **400 PARAMETER_ERROR.INVALID**.
 - Body is **gzipped TSV** via `Accept: application/a-gzip` — must be gunzipped (`getGzipReport`). The key must hold the **Sales/Finance** role (Analytics-only keys 500 here).
-- Apple requires a report **`version`** and only supports certain `(reportType, version)` pairs (see `defaultVersion` map in `analytics.ts`); missing/wrong version → **500**. Subscription report types (`SUBSCRIPTION`, `SUBSCRIPTION_EVENT`, `SUBSCRIBER`) are **DAILY-only**, version `1_4`.
-- Reports are account-wide — filter rows by `App Apple ID`.
+- Reports are account-wide — filter rows by `App Apple ID` (sales) / `App Apple ID` col, or `Apple Identifier` (the `SALES` report names it `Apple Identifier`).
+
+#### `version` per `reportType` — must be exact (aligned to API 4.3)
+Apple requires a report **`version`** and accepts only specific values per report type. The `defaultVersion` map in `analytics.ts` is the source of truth; verified values:
+
+| reportType | version | notes |
+|---|---|---|
+| `SALES` | `1_1` | downloads/revenue; `Product Type Identifier` `1F`=first-time free dl, `3F`=redownload, `7F`=update |
+| `SUBSCRIPTION` | `1_4` | active-subscriber snapshot (churn base); DAILY-only |
+| `SUBSCRIPTION_EVENT` | `1_4` | lifecycle/churn events; DAILY-only. Has `Original Start Date` → enables a **trial→paid cohort** |
+| `SUBSCRIBER` | `1_4` | per-subscriber detail; DAILY-only |
+| `INSTALLS` | `1_2` | **4.3**; first-time/redownload/update installs w/ territory+channel+install-type pivots — cleaner than parsing `SALES` product types |
+| `WIN_BACK_ELIGIBILITY` | `1_0` | **4.3**; verified (returns rows) |
+| `FIRST_ANNUAL` | `1_0` | **4.3**; *unverified* (no data to validate) |
+| `SUBSCRIPTION_OFFER_CODE_REDEMPTION` | `1_0` | **4.3**; *unverified* — this account returns "invalid vendor number" (likely not enabled) |
+| `NEWSSTAND` / `PRE_ORDER` | `1_0` | |
+
+New 4.3 `reportSubType`s: `SUMMARY_INSTALL_TYPE`, `SUMMARY_TERRITORY`, `SUMMARY_CHANNEL` (pivot the `INSTALLS` summary), alongside `SUMMARY`/`DETAILED`.
+
+#### Discovering the right `version` (don't guess)
+Pass a deliberately-bogus version (e.g. `9_9`); Apple's **400** error body states the answer: *"The version parameter you have specified is invalid. The latest version for this report is `X_Y`."* (This is how `INSTALLS=1_2` was found.)
+
+#### Decoding sales-report responses
+- **404 "No report is available…" / "There were no sales…"** → params VALID, just no data for that date/frequency. **Not** an error to fix. (Monthly/yearly reports finalize a few days after the period; future/empty dates 404.)
+- **400 "version … invalid"** → wrong `version`; the message names the correct one (see above).
+- **400 "Invalid vendor number"** → usually a real vendor-number problem, but can also mean **that report type isn't enabled for the account** (seen on `SUBSCRIPTION_OFFER_CODE_REDEMPTION` even with a valid vendor #).
 
 ## Notes
 
