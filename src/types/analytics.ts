@@ -109,14 +109,26 @@ export interface ListAnalyticsReportSegmentsResponse {
 }
 
 // Sales and Finance Reports Types
+// reportType set per App Store Connect API 4.3 (filter[reportType] on /v1/salesReports).
 export type SalesReportType =
   | 'SALES'
-  | 'SUBSCRIPTION'        // Active subscriber state (snapshot of active subs as of reportDate)
-  | 'SUBSCRIPTION_EVENT'  // Subscription lifecycle events incl. cancellations / churn
-  | 'SUBSCRIBER'          // Detailed per-subscriber transactions
+  | 'SUBSCRIPTION'                        // Active subscriber state (snapshot of active subs as of reportDate)
+  | 'SUBSCRIPTION_EVENT'                  // Subscription lifecycle events incl. cancellations / churn
+  | 'SUBSCRIBER'                          // Detailed per-subscriber transactions
+  | 'SUBSCRIPTION_OFFER_CODE_REDEMPTION'  // Offer-code redemptions (4.3)
+  | 'INSTALLS'                            // First-time / redownload / update installs (4.3)
+  | 'FIRST_ANNUAL'                        // First-year subscriber conversions (4.3)
+  | 'WIN_BACK_ELIGIBILITY'                // Win-back offer eligibility (4.3)
   | 'NEWSSTAND'
   | 'PRE_ORDER';
-export type SalesReportSubType = 'SUMMARY' | 'DETAILED' | 'OPT_IN';
+// reportSubType set per 4.3. The SUMMARY_* variants pivot the summary by install type / territory / channel.
+export type SalesReportSubType =
+  | 'SUMMARY'
+  | 'DETAILED'
+  | 'SUMMARY_INSTALL_TYPE'
+  | 'SUMMARY_TERRITORY'
+  | 'SUMMARY_CHANNEL'
+  | 'OPT_IN';
 export type SalesReportFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 
 export interface SalesReportResponse {

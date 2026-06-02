@@ -64,6 +64,6 @@ The data chain is **request → reports → instances → segments → download*
 ## Notes
 
 - `src/submit-app.ts` and `submit_app.py` are currently commented-out / standalone scratch files, not part of the server build path.
-- `3.2.json` is a large reference data file, not source code.
+- `4.3.json` is the App Store Connect API OpenAPI spec (reference data, not part of the build). Upgraded from the stale `3.2.json` on 2026-06-02; `download_sales_report`'s report-type/subtype enums + default-version map were aligned to 4.3 (added `INSTALLS`, `FIRST_ANNUAL`, `WIN_BACK_ELIGIBILITY`, `SUBSCRIPTION_OFFER_CODE_REDEMPTION` and the `SUMMARY_INSTALL_TYPE/TERRITORY/CHANNEL` subtypes). Latest spec tracked at github.com/EvanBacon/App-Store-Connect-OpenAPI-Spec.
 - Errors thrown as `McpError` (from validation helpers) are surfaced to the MCP client as structured tool errors.
 - **Live-debugging the raw API** (faster than round-tripping through the MCP): mint a JWT with the committed key and `fetch` directly — `node` one-liner using `jsonwebtoken` (already a dep): `jwt.sign({iss:ISSUER,aud:'appstoreconnect-v1'}, fs.readFileSync(P8), {algorithm:'ES256',expiresIn:'10m',keyid:KEY_ID})`. Run it from the repo root so `node_modules` resolves.

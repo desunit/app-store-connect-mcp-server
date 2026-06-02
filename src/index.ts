@@ -899,14 +899,14 @@ class AppStoreConnectServer {
             },
             reportType: {
               type: "string",
-              enum: ["SALES", "SUBSCRIPTION", "SUBSCRIPTION_EVENT", "SUBSCRIBER", "NEWSSTAND", "PRE_ORDER"],
-              description: "Type of report. SALES = downloads/revenue; SUBSCRIPTION = active subscriber snapshot; SUBSCRIPTION_EVENT = lifecycle events incl. cancellations/churn; SUBSCRIBER = detailed per-subscriber.",
+              enum: ["SALES", "SUBSCRIPTION", "SUBSCRIPTION_EVENT", "SUBSCRIBER", "SUBSCRIPTION_OFFER_CODE_REDEMPTION", "INSTALLS", "FIRST_ANNUAL", "WIN_BACK_ELIGIBILITY", "NEWSSTAND", "PRE_ORDER"],
+              description: "Type of report (App Store Connect API 4.3). SALES = downloads/revenue; SUBSCRIPTION = active subscriber snapshot; SUBSCRIPTION_EVENT = lifecycle events incl. cancellations/churn; SUBSCRIBER = detailed per-subscriber; INSTALLS = first-time/redownload/update installs; FIRST_ANNUAL = first-year subscriber conversions; WIN_BACK_ELIGIBILITY = win-back offer eligibility; SUBSCRIPTION_OFFER_CODE_REDEMPTION = offer-code redemptions.",
               default: "SALES"
             },
             reportSubType: {
               type: "string",
-              enum: ["SUMMARY", "DETAILED", "OPT_IN"],
-              description: "Sub-type of the report (SUMMARY for SALES/SUBSCRIPTION/SUBSCRIPTION_EVENT; DETAILED for SUBSCRIBER)",
+              enum: ["SUMMARY", "DETAILED", "SUMMARY_INSTALL_TYPE", "SUMMARY_TERRITORY", "SUMMARY_CHANNEL", "OPT_IN"],
+              description: "Sub-type of the report. SUMMARY for SALES/SUBSCRIPTION/SUBSCRIPTION_EVENT; DETAILED for SUBSCRIBER; SUMMARY_INSTALL_TYPE / SUMMARY_TERRITORY / SUMMARY_CHANNEL pivot the INSTALLS summary.",
               default: "SUMMARY"
             },
             frequency: {
@@ -921,7 +921,7 @@ class AppStoreConnectServer {
             },
             version: {
               type: "string",
-              description: "Report version. Defaults per type (SALES=1_1, SUBSCRIPTION/SUBSCRIPTION_EVENT/SUBSCRIBER=1_4). Override only if Apple changes the schema."
+              description: "Report version. Defaults per type (SALES=1_1; SUBSCRIPTION/SUBSCRIPTION_EVENT/SUBSCRIBER=1_4; INSTALLS=1_2; FIRST_ANNUAL/WIN_BACK_ELIGIBILITY/SUBSCRIPTION_OFFER_CODE_REDEMPTION/NEWSSTAND/PRE_ORDER=1_0). Override only if Apple changes the schema."
             }
           },
           required: ["reportDate"]
