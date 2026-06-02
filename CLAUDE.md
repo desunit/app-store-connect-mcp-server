@@ -34,12 +34,36 @@ Three-layer structure, all wired together in `src/index.ts`:
    - `buildToolsList()`: the JSON-Schema tool definitions returned by `ListToolsRequestSchema`.
    - `setupHandlers()`: a single `switch (request.params.name)` in the `CallToolRequestSchema` handler that routes each tool name to a handler method.
 
-   Adding/changing a tool means editing the schema in `buildToolsList()` **and** the `case` in `setupHandlers()`. Most cases return `{ toolResult: ... }`; report-download cases return `{ content: [{ type: "text", text: ... }] }`.
+   Adding/changing a tool means editing the schema in `buildToolsList()` **and** the `case` in `setupHandlers()`.
+
+   **Response shape — always `formatResponse(...)`, never `{ toolResult: ... }`.** Every case must return the MCP `{ content: [{ type: "text", text }] }` envelope. The local helper `formatResponse(data)` does exactly that (JSON-stringified). Returning a bare `{ toolResult: data }` makes MCP clients render the literal string **`[object Object]`** — a bug we hit repeatedly. As of the 2026-06-02 cleanup all cases use `formatResponse`; report-download cases build the `content` envelope directly because their body is already a TSV string. Do not reintroduce `toolResult`.
 
 `src/types/` holds request/response interfaces per domain, re-exported via `src/types/index.ts`. `src/utils/validation.ts` provides shared helpers used throughout handlers: `validateRequired`, `validateEnum`, `sanitizeLimit` (clamps to 1–200, default 100), `buildFilterParams` (`filter[key]=...`), `buildFieldParams` (`fields[key]=...`).
+
+## API gotchas (hard-won — read before touching analytics/reports)
+
+Keep this list current: when you discover an Apple-API quirk that cost real debugging time, add it here so it isn't rediscovered.
+
+### Response shape
+- **Never `{ toolResult }` → renders as `[object Object]`.** Always `formatResponse(...)`. (See Architecture §3.) This recurred multiple times; it is the single most common mistake in this repo.
+
+### Analytics Reports API (`AnalyticsHandlers`)
+The data chain is **request → reports → instances → segments → download**, and several steps have non-obvious constraints:
+- **You cannot list report requests.** Apple forbids `GET_COLLECTION` on `/analyticsReportRequests` (allowed ops: CREATE, DELETE, GET_INSTANCE), and `create` returns **409 "You already have such an entity"** if one already exists for that app+accessType — *without* returning the existing id. Recover the id via the app relationship `GET /apps/{appId}/analyticsReportRequests` → tool `list_analytics_report_requests`. There is one request entity per `accessType` (`ONGOING`, `ONE_TIME_SNAPSHOT`).
+- **Segments hang off an instance, not a report.** `GET /analyticsReports/{id}/segments` 404s (`relationship 'segments' ...`). Correct path: `list_analytics_report_instances` (`/analyticsReports/{id}/instances`, one instance per granularity+processingDate) → `list_analytics_report_segments` (`/analyticsReportInstances/{instanceId}/segments`).
+- **`filter[category]` values are singular: `COMMERCE`, `FRAMEWORK_USAGE`** — `APP_STORE_COMMERCE` / `FRAMEWORKS_USAGE` return **400 PARAMETER_ERROR**. Valid set: `APP_STORE_ENGAGEMENT`, `APP_USAGE`, `COMMERCE`, `FRAMEWORK_USAGE`, `PERFORMANCE` (the `AnalyticsReportCategory` type mirrors these).
+- **Instances are generated asynchronously** (hours → ~a day after the request is created). An empty instance list means "not ready yet", not "no data".
+- **No cohort report exists.** The `COMMERCE` category has `App Downloads`, `App Store Purchases`, `App Store Subscription Event/State` (Standard/Detailed each) — but no download→paid / conversion cohort. Cohorts are App Analytics web-UI only; approximate by joining `App Downloads Detailed` + `App Store Purchases`/subscription reports on date+territory (aggregate, not per-user).
+
+### Sales / Finance Reports API (`downloadSalesReport` / `downloadFinanceReport`)
+- Requires `APP_STORE_CONNECT_VENDOR_NUMBER` (account-level, from Payments and Financial Reports — **not** the iTunes provider id, **not** an app Apple ID). Wrong vendor number → **400 PARAMETER_ERROR.INVALID**.
+- Body is **gzipped TSV** via `Accept: application/a-gzip` — must be gunzipped (`getGzipReport`). The key must hold the **Sales/Finance** role (Analytics-only keys 500 here).
+- Apple requires a report **`version`** and only supports certain `(reportType, version)` pairs (see `defaultVersion` map in `analytics.ts`); missing/wrong version → **500**. Subscription report types (`SUBSCRIPTION`, `SUBSCRIPTION_EVENT`, `SUBSCRIBER`) are **DAILY-only**, version `1_4`.
+- Reports are account-wide — filter rows by `App Apple ID`.
 
 ## Notes
 
 - `src/submit-app.ts` and `submit_app.py` are currently commented-out / standalone scratch files, not part of the server build path.
 - `3.2.json` is a large reference data file, not source code.
 - Errors thrown as `McpError` (from validation helpers) are surfaced to the MCP client as structured tool errors.
+- **Live-debugging the raw API** (faster than round-tripping through the MCP): mint a JWT with the committed key and `fetch` directly — `node` one-liner using `jsonwebtoken` (already a dep): `jwt.sign({iss:ISSUER,aud:'appstoreconnect-v1'}, fs.readFileSync(P8), {algorithm:'ES256',expiresIn:'10m',keyid:KEY_ID})`. Run it from the repo root so `node_modules` resolves.

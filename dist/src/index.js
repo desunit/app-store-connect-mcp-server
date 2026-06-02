@@ -954,13 +954,13 @@ class AppStoreConnectServer {
                         return formatResponse(appInfo);
                     // Beta Testing
                     case "list_beta_groups":
-                        return { toolResult: await this.betaHandlers.listBetaGroups(args) };
+                        return formatResponse(await this.betaHandlers.listBetaGroups(args));
                     case "list_group_testers":
-                        return { toolResult: await this.betaHandlers.listGroupTesters(args) };
+                        return formatResponse(await this.betaHandlers.listGroupTesters(args));
                     case "add_tester_to_group":
-                        return { toolResult: await this.betaHandlers.addTesterToGroup(args) };
+                        return formatResponse(await this.betaHandlers.addTesterToGroup(args));
                     case "remove_tester_from_group":
-                        return { toolResult: await this.betaHandlers.removeTesterFromGroup(args) };
+                        return formatResponse(await this.betaHandlers.removeTesterFromGroup(args));
                     case "list_beta_feedback_screenshots":
                         const feedbackData = await this.betaHandlers.listBetaFeedbackScreenshots(args);
                         return formatResponse(feedbackData);
@@ -974,45 +974,45 @@ class AppStoreConnectServer {
                         return formatResponse(result);
                     // App Store Version Localizations
                     case "create_app_store_version":
-                        return { toolResult: await this.localizationHandlers.createAppStoreVersion(args) };
+                        return formatResponse(await this.localizationHandlers.createAppStoreVersion(args));
                     case "list_app_store_versions":
-                        return { toolResult: await this.localizationHandlers.listAppStoreVersions(args) };
+                        return formatResponse(await this.localizationHandlers.listAppStoreVersions(args));
                     case "list_app_store_version_localizations":
-                        return { toolResult: await this.localizationHandlers.listAppStoreVersionLocalizations(args) };
+                        return formatResponse(await this.localizationHandlers.listAppStoreVersionLocalizations(args));
                     case "get_app_store_version_localization":
-                        return { toolResult: await this.localizationHandlers.getAppStoreVersionLocalization(args) };
+                        return formatResponse(await this.localizationHandlers.getAppStoreVersionLocalization(args));
                     case "update_app_store_version_localization":
-                        return { toolResult: await this.localizationHandlers.updateAppStoreVersionLocalization(args) };
+                        return formatResponse(await this.localizationHandlers.updateAppStoreVersionLocalization(args));
                     // Bundle IDs
                     case "create_bundle_id":
-                        return { toolResult: await this.bundleHandlers.createBundleId(args) };
+                        return formatResponse(await this.bundleHandlers.createBundleId(args));
                     case "list_bundle_ids":
-                        return { toolResult: await this.bundleHandlers.listBundleIds(args) };
+                        return formatResponse(await this.bundleHandlers.listBundleIds(args));
                     case "get_bundle_id_info":
-                        return { toolResult: await this.bundleHandlers.getBundleIdInfo(args) };
+                        return formatResponse(await this.bundleHandlers.getBundleIdInfo(args));
                     case "enable_bundle_capability":
-                        return { toolResult: await this.bundleHandlers.enableBundleCapability(args) };
+                        return formatResponse(await this.bundleHandlers.enableBundleCapability(args));
                     case "disable_bundle_capability":
-                        return { toolResult: await this.bundleHandlers.disableBundleCapability(args) };
+                        return formatResponse(await this.bundleHandlers.disableBundleCapability(args));
                     // Devices
                     case "list_devices":
-                        return { toolResult: await this.deviceHandlers.listDevices(args) };
+                        return formatResponse(await this.deviceHandlers.listDevices(args));
                     // Users
                     case "list_users":
-                        return { toolResult: await this.userHandlers.listUsers(args) };
+                        return formatResponse(await this.userHandlers.listUsers(args));
                     // Analytics & Reports
                     case "create_analytics_report_request":
-                        return { toolResult: await this.analyticsHandlers.createAnalyticsReportRequest(args) };
+                        return formatResponse(await this.analyticsHandlers.createAnalyticsReportRequest(args));
                     case "list_analytics_report_requests":
-                        return { toolResult: await this.analyticsHandlers.listAnalyticsReportRequests(args) };
+                        return formatResponse(await this.analyticsHandlers.listAnalyticsReportRequests(args));
                     case "list_analytics_reports":
-                        return { toolResult: await this.analyticsHandlers.listAnalyticsReports(args) };
+                        return formatResponse(await this.analyticsHandlers.listAnalyticsReports(args));
                     case "list_analytics_report_instances":
-                        return { toolResult: await this.analyticsHandlers.listAnalyticsReportInstances(args) };
+                        return formatResponse(await this.analyticsHandlers.listAnalyticsReportInstances(args));
                     case "list_analytics_report_segments":
-                        return { toolResult: await this.analyticsHandlers.listAnalyticsReportSegments(args) };
+                        return formatResponse(await this.analyticsHandlers.listAnalyticsReportSegments(args));
                     case "download_analytics_report_segment":
-                        return { toolResult: await this.analyticsHandlers.downloadAnalyticsReportSegment(args) };
+                        return formatResponse(await this.analyticsHandlers.downloadAnalyticsReportSegment(args));
                     case "download_sales_report":
                         if (!config.vendorNumber) {
                             throw new McpError(ErrorCode.MethodNotFound, "Sales reports are not available. Please set APP_STORE_CONNECT_VENDOR_NUMBER environment variable.");
@@ -1026,7 +1026,7 @@ class AppStoreConnectServer {
                         return { content: [{ type: "text", text: (await this.analyticsHandlers.downloadFinanceReport(args)).data }] };
                     // Xcode Development Tools
                     case "list_schemes":
-                        return { toolResult: await this.xcodeHandlers.listSchemes(args) };
+                        return formatResponse(await this.xcodeHandlers.listSchemes(args));
                     default:
                         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
                 }
