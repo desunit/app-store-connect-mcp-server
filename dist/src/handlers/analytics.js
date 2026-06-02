@@ -49,17 +49,29 @@ export class AnalyticsHandlers {
         return this.client.downloadFromUrl(segmentUrl);
     }
     async downloadSalesReport(args) {
-        const { vendorNumber = this.config?.vendorNumber, reportType = "SALES", reportSubType = "SUMMARY", frequency = "MONTHLY", reportDate } = args;
+        const { vendorNumber = this.config?.vendorNumber, reportType = "SALES", reportSubType = "SUMMARY", frequency = "MONTHLY", reportDate, version } = args;
         if (!vendorNumber) {
             throw new Error('Vendor number is required. Please provide it as an argument or set APP_STORE_CONNECT_VENDOR_NUMBER environment variable.');
         }
         validateRequired({ reportDate }, ['reportDate']);
+        // Apple requires a report `version` and only supports certain
+        // (reportType, version) pairs. Pick a sensible default per type
+        // unless the caller overrides it. Subscription reports are DAILY-only.
+        const defaultVersion = {
+            SALES: "1_1",
+            SUBSCRIPTION: "1_4",
+            SUBSCRIPTION_EVENT: "1_4",
+            SUBSCRIBER: "1_4",
+            NEWSSTAND: "1_0",
+            PRE_ORDER: "1_0"
+        };
         const filters = {
             reportDate,
             reportType,
             reportSubType,
             frequency,
-            vendorNumber
+            vendorNumber,
+            version: version ?? defaultVersion[reportType] ?? "1_0"
         };
         return this.client.get('/salesReports', buildFilterParams(filters));
     }

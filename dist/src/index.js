@@ -803,7 +803,7 @@ class AppStoreConnectServer {
         const paymentReportTools = [
             {
                 name: "download_sales_report",
-                description: "Download sales and trends reports",
+                description: "Download sales, trends and subscription reports. Use reportType SUBSCRIPTION for active-subscriber state (churn base) and SUBSCRIPTION_EVENT for cancellation/churn events. Subscription reports are DAILY-only and segmented by app — filter rows by 'App Apple ID'.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -814,25 +814,29 @@ class AppStoreConnectServer {
                         },
                         reportType: {
                             type: "string",
-                            enum: ["SALES"],
-                            description: "Type of report to download",
+                            enum: ["SALES", "SUBSCRIPTION", "SUBSCRIPTION_EVENT", "SUBSCRIBER", "NEWSSTAND", "PRE_ORDER"],
+                            description: "Type of report. SALES = downloads/revenue; SUBSCRIPTION = active subscriber snapshot; SUBSCRIPTION_EVENT = lifecycle events incl. cancellations/churn; SUBSCRIBER = detailed per-subscriber.",
                             default: "SALES"
                         },
                         reportSubType: {
                             type: "string",
-                            enum: ["SUMMARY", "DETAILED"],
-                            description: "Sub-type of the report",
+                            enum: ["SUMMARY", "DETAILED", "OPT_IN"],
+                            description: "Sub-type of the report (SUMMARY for SALES/SUBSCRIPTION/SUBSCRIPTION_EVENT; DETAILED for SUBSCRIBER)",
                             default: "SUMMARY"
                         },
                         frequency: {
                             type: "string",
                             enum: ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"],
-                            description: "Frequency of the report",
+                            description: "Frequency of the report. Subscription reports support DAILY only.",
                             default: "MONTHLY"
                         },
                         reportDate: {
                             type: "string",
-                            description: "Report date in YYYY-MM format (e.g., '2024-01')"
+                            description: "Report date. DAILY: 'YYYY-MM-DD', WEEKLY: 'YYYY-MM-DD' (week end), MONTHLY: 'YYYY-MM', YEARLY: 'YYYY'."
+                        },
+                        version: {
+                            type: "string",
+                            description: "Report version. Defaults per type (SALES=1_1, SUBSCRIPTION/SUBSCRIPTION_EVENT/SUBSCRIBER=1_4). Override only if Apple changes the schema."
                         }
                     },
                     required: ["reportDate"]

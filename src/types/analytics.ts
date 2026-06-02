@@ -78,8 +78,14 @@ export interface ListAnalyticsReportSegmentsResponse {
 }
 
 // Sales and Finance Reports Types
-export type SalesReportType = 'SALES';
-export type SalesReportSubType = 'SUMMARY' | 'DETAILED';
+export type SalesReportType =
+  | 'SALES'
+  | 'SUBSCRIPTION'        // Active subscriber state (snapshot of active subs as of reportDate)
+  | 'SUBSCRIPTION_EVENT'  // Subscription lifecycle events incl. cancellations / churn
+  | 'SUBSCRIBER'          // Detailed per-subscriber transactions
+  | 'NEWSSTAND'
+  | 'PRE_ORDER';
+export type SalesReportSubType = 'SUMMARY' | 'DETAILED' | 'OPT_IN';
 export type SalesReportFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 
 export interface SalesReportResponse {
@@ -96,6 +102,7 @@ export interface SalesReportFilters {
   reportSubType: SalesReportSubType;
   frequency: SalesReportFrequency;
   vendorNumber: string;
+  version?: string; // Report version, e.g. '1_4' for SUBSCRIPTION/SUBSCRIPTION_EVENT, '1_1' for SALES
 }
 
 export interface FinanceReportFilters {
