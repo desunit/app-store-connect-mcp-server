@@ -1,9 +1,14 @@
-export type AnalyticsReportCategory = 
-  | 'APP_STORE_ENGAGEMENT' 
-  | 'APP_STORE_COMMERCE' 
-  | 'APP_USAGE' 
-  | 'FRAMEWORKS_USAGE' 
+// NOTE: these are the values Apple's `filter[category]` accepts on
+// /analyticsReportRequests/{id}/reports. `COMMERCE` and `FRAMEWORK_USAGE`
+// are singular — `APP_STORE_COMMERCE` / `FRAMEWORKS_USAGE` return 400.
+export type AnalyticsReportCategory =
+  | 'APP_STORE_ENGAGEMENT'
+  | 'COMMERCE'
+  | 'APP_USAGE'
+  | 'FRAMEWORK_USAGE'
   | 'PERFORMANCE';
+
+export type AnalyticsReportGranularity = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 export type AnalyticsAccessType = 'ONGOING' | 'ONE_TIME_SNAPSHOT';
 
@@ -59,6 +64,15 @@ export interface AnalyticsReport {
   };
 }
 
+export interface AnalyticsReportInstance {
+  id: string;
+  type: 'analyticsReportInstances';
+  attributes: {
+    granularity: AnalyticsReportGranularity;
+    processingDate: string;
+  };
+}
+
 export interface AnalyticsReportSegment {
   id: string;
   type: 'analyticsReportSegments';
@@ -69,8 +83,25 @@ export interface AnalyticsReportSegment {
   };
 }
 
+export interface AnalyticsReportRequestSummary {
+  id: string;
+  type: 'analyticsReportRequests';
+  attributes: {
+    accessType: AnalyticsAccessType;
+    stoppedDueToInactivity: boolean;
+  };
+}
+
+export interface ListAnalyticsReportRequestsResponse {
+  data: AnalyticsReportRequestSummary[];
+}
+
 export interface ListAnalyticsReportsResponse {
   data: AnalyticsReport[];
+}
+
+export interface ListAnalyticsReportInstancesResponse {
+  data: AnalyticsReportInstance[];
 }
 
 export interface ListAnalyticsReportSegmentsResponse {

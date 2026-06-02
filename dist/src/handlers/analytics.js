@@ -27,6 +27,16 @@ export class AnalyticsHandlers {
         };
         return this.client.post('/analyticsReportRequests', requestBody);
     }
+    // Apple forbids GET_COLLECTION on /analyticsReportRequests, so the only way
+    // to recover an existing request's ID (create just 409s "already have such
+    // an entity") is via the app -> requests relationship.
+    async listAnalyticsReportRequests(args) {
+        const { appId, limit = 100 } = args;
+        validateRequired(args, ['appId']);
+        return this.client.get(`/apps/${appId}/analyticsReportRequests`, {
+            limit: sanitizeLimit(limit)
+        });
+    }
     async listAnalyticsReports(args) {
         const { reportRequestId, limit = 100, filter } = args;
         validateRequired(args, ['reportRequestId']);
@@ -36,10 +46,24 @@ export class AnalyticsHandlers {
         Object.assign(params, buildFilterParams(filter));
         return this.client.get(`/analyticsReportRequests/${reportRequestId}/reports`, params);
     }
-    async listAnalyticsReportSegments(args) {
-        const { reportId, limit = 100 } = args;
+    // A report has one instance per (granularity, processingDate). Apple
+    // generates instances asynchronously after the request is created
+    // (hours -> ~a day), so an empty list means "not ready yet", not "no data".
+    async listAnalyticsReportInstances(args) {
+        const { reportId, limit = 100, filter } = args;
         validateRequired(args, ['reportId']);
-        return this.client.get(`/analyticsReports/${reportId}/segments`, {
+        const params = {
+            limit: sanitizeLimit(limit)
+        };
+        Object.assign(params, buildFilterParams(filter));
+        return this.client.get(`/analyticsReports/${reportId}/instances`, params);
+    }
+    // Segments hang off an *instance*, not the report. The old
+    // /analyticsReports/{id}/segments path 404s ("relationship 'segments' ...").
+    async listAnalyticsReportSegments(args) {
+        const { instanceId, limit = 100 } = args;
+        validateRequired(args, ['instanceId']);
+        return this.client.get(`/analyticsReportInstances/${instanceId}/segments`, {
             limit: sanitizeLimit(limit)
         });
     }

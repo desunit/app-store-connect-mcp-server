@@ -749,6 +749,26 @@ class AppStoreConnectServer {
           }
         },
         {
+          name: "list_analytics_report_requests",
+          description: "List existing analytics report requests for an app (with their IDs and accessType). Use this to recover a reportRequestId — Apple does not allow listing the requests collection directly, and create just errors if one already exists.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              appId: {
+                type: "string",
+                description: "The ID of the app whose analytics report requests to list"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of requests to return (default: 100)",
+                minimum: 1,
+                maximum: 200
+              }
+            },
+            required: ["appId"]
+          }
+        },
+        {
           name: "list_analytics_reports",
           description: "Get available analytics reports for a specific report request",
           inputSchema: {
@@ -769,8 +789,8 @@ class AppStoreConnectServer {
                 properties: {
                   category: {
                     type: "string",
-                    enum: ["APP_STORE_ENGAGEMENT", "APP_STORE_COMMERCE", "APP_USAGE", "FRAMEWORKS_USAGE", "PERFORMANCE"],
-                    description: "Filter by report category"
+                    enum: ["APP_STORE_ENGAGEMENT", "COMMERCE", "APP_USAGE", "FRAMEWORK_USAGE", "PERFORMANCE"],
+                    description: "Filter by report category (COMMERCE = downloads/purchases/subscriptions)"
                   }
                 }
               }
@@ -779,14 +799,48 @@ class AppStoreConnectServer {
           }
         },
         {
-          name: "list_analytics_report_segments",
-          description: "Get segments for a specific analytics report (contains download URLs)",
+          name: "list_analytics_report_instances",
+          description: "Get instances of an analytics report. Each instance is one (granularity, processingDate) snapshot; segments hang off an instance. Instances are generated asynchronously after the request is created (hours to ~a day) — an empty list means not ready yet.",
           inputSchema: {
             type: "object",
             properties: {
               reportId: {
                 type: "string",
-                description: "The ID of the analytics report"
+                description: "The ID of the analytics report (from list_analytics_reports)"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of instances to return (default: 100)",
+                minimum: 1,
+                maximum: 200
+              },
+              filter: {
+                type: "object",
+                properties: {
+                  granularity: {
+                    type: "string",
+                    enum: ["DAILY", "WEEKLY", "MONTHLY"],
+                    description: "Filter by granularity"
+                  },
+                  processingDate: {
+                    type: "string",
+                    description: "Filter by processing date (YYYY-MM-DD)"
+                  }
+                }
+              }
+            },
+            required: ["reportId"]
+          }
+        },
+        {
+          name: "list_analytics_report_segments",
+          description: "Get segments for a specific analytics report INSTANCE (contains the download URLs). Pass an instanceId from list_analytics_report_instances, not a reportId.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              instanceId: {
+                type: "string",
+                description: "The ID of the analytics report instance (from list_analytics_report_instances)"
               },
               limit: {
                 type: "number",
@@ -795,7 +849,7 @@ class AppStoreConnectServer {
                 maximum: 200
               }
             },
-            required: ["reportId"]
+            required: ["instanceId"]
           }
         },
         {
@@ -1006,10 +1060,16 @@ class AppStoreConnectServer {
           // Analytics & Reports
           case "create_analytics_report_request":
             return { toolResult: await this.analyticsHandlers.createAnalyticsReportRequest(args as any) };
-          
+
+          case "list_analytics_report_requests":
+            return { toolResult: await this.analyticsHandlers.listAnalyticsReportRequests(args as any) };
+
           case "list_analytics_reports":
             return { toolResult: await this.analyticsHandlers.listAnalyticsReports(args as any) };
-          
+
+          case "list_analytics_report_instances":
+            return { toolResult: await this.analyticsHandlers.listAnalyticsReportInstances(args as any) };
+
           case "list_analytics_report_segments":
             return { toolResult: await this.analyticsHandlers.listAnalyticsReportSegments(args as any) };
           

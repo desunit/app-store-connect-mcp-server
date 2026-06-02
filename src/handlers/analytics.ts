@@ -1,11 +1,14 @@
 import { AppStoreConnectClient } from '../services/index.js';
-import { 
+import {
   AnalyticsReportRequest,
   AnalyticsReportRequestResponse,
+  ListAnalyticsReportRequestsResponse,
   ListAnalyticsReportsResponse,
+  ListAnalyticsReportInstancesResponse,
   ListAnalyticsReportSegmentsResponse,
   AnalyticsAccessType,
   AnalyticsReportCategory,
+  AnalyticsReportGranularity,
   SalesReportResponse,
   FinanceReportResponse,
   SalesReportType,
@@ -47,6 +50,22 @@ export class AnalyticsHandlers {
     return this.client.post<AnalyticsReportRequestResponse>('/analyticsReportRequests', requestBody);
   }
 
+  // Apple forbids GET_COLLECTION on /analyticsReportRequests, so the only way
+  // to recover an existing request's ID (create just 409s "already have such
+  // an entity") is via the app -> requests relationship.
+  async listAnalyticsReportRequests(args: {
+    appId: string;
+    limit?: number;
+  }): Promise<ListAnalyticsReportRequestsResponse> {
+    const { appId, limit = 100 } = args;
+
+    validateRequired(args, ['appId']);
+
+    return this.client.get<ListAnalyticsReportRequestsResponse>(`/apps/${appId}/analyticsReportRequests`, {
+      limit: sanitizeLimit(limit)
+    });
+  }
+
   async listAnalyticsReports(args: {
     reportRequestId: string;
     limit?: number;
@@ -67,15 +86,41 @@ export class AnalyticsHandlers {
     return this.client.get<ListAnalyticsReportsResponse>(`/analyticsReportRequests/${reportRequestId}/reports`, params);
   }
 
-  async listAnalyticsReportSegments(args: {
+  // A report has one instance per (granularity, processingDate). Apple
+  // generates instances asynchronously after the request is created
+  // (hours -> ~a day), so an empty list means "not ready yet", not "no data".
+  async listAnalyticsReportInstances(args: {
     reportId: string;
     limit?: number;
-  }): Promise<ListAnalyticsReportSegmentsResponse> {
-    const { reportId, limit = 100 } = args;
-    
+    filter?: {
+      granularity?: AnalyticsReportGranularity;
+      processingDate?: string;
+    };
+  }): Promise<ListAnalyticsReportInstancesResponse> {
+    const { reportId, limit = 100, filter } = args;
+
     validateRequired(args, ['reportId']);
 
-    return this.client.get<ListAnalyticsReportSegmentsResponse>(`/analyticsReports/${reportId}/segments`, {
+    const params: Record<string, any> = {
+      limit: sanitizeLimit(limit)
+    };
+
+    Object.assign(params, buildFilterParams(filter));
+
+    return this.client.get<ListAnalyticsReportInstancesResponse>(`/analyticsReports/${reportId}/instances`, params);
+  }
+
+  // Segments hang off an *instance*, not the report. The old
+  // /analyticsReports/{id}/segments path 404s ("relationship 'segments' ...").
+  async listAnalyticsReportSegments(args: {
+    instanceId: string;
+    limit?: number;
+  }): Promise<ListAnalyticsReportSegmentsResponse> {
+    const { instanceId, limit = 100 } = args;
+
+    validateRequired(args, ['instanceId']);
+
+    return this.client.get<ListAnalyticsReportSegmentsResponse>(`/analyticsReportInstances/${instanceId}/segments`, {
       limit: sanitizeLimit(limit)
     });
   }
