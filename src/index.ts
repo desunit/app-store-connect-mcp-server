@@ -1023,8 +1023,9 @@ class AppStoreConnectServer {
                 "Sales reports are not available. Please set APP_STORE_CONNECT_VENDOR_NUMBER environment variable."
               );
             }
-            return { toolResult: await this.analyticsHandlers.downloadSalesReport(args as any) };
-          
+            // Return the report TSV as plain text (not JSON-escaped) so tabs/newlines stay readable.
+            return { content: [{ type: "text", text: (await this.analyticsHandlers.downloadSalesReport(args as any)).data }] };
+
           case "download_finance_report":
             if (!config.vendorNumber) {
               throw new McpError(
@@ -1032,7 +1033,7 @@ class AppStoreConnectServer {
                 "Finance reports are not available. Please set APP_STORE_CONNECT_VENDOR_NUMBER environment variable."
               );
             }
-            return { toolResult: await this.analyticsHandlers.downloadFinanceReport(args as any) };
+            return { content: [{ type: "text", text: (await this.analyticsHandlers.downloadFinanceReport(args as any)).data }] };
 
           // Xcode Development Tools
           case "list_schemes":

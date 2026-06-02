@@ -73,7 +73,7 @@ export class AnalyticsHandlers {
             vendorNumber,
             version: version ?? defaultVersion[reportType] ?? "1_0"
         };
-        return this.client.get('/salesReports', buildFilterParams(filters));
+        return this.client.getGzipReport('/salesReports', buildFilterParams(filters));
     }
     async downloadFinanceReport(args) {
         const { vendorNumber = this.config?.vendorNumber, reportDate, regionCode } = args;
@@ -86,6 +86,6 @@ export class AnalyticsHandlers {
             regionCode,
             vendorNumber
         };
-        return this.client.get('/financeReports', buildFilterParams(filters));
+        return this.client.getGzipReport('/financeReports', buildFilterParams(filters));
     }
 }
