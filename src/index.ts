@@ -900,7 +900,7 @@ class AppStoreConnectServer {
             reportType: {
               type: "string",
               enum: ["SALES", "SUBSCRIPTION", "SUBSCRIPTION_EVENT", "SUBSCRIBER", "SUBSCRIPTION_OFFER_CODE_REDEMPTION", "INSTALLS", "FIRST_ANNUAL", "WIN_BACK_ELIGIBILITY", "NEWSSTAND", "PRE_ORDER"],
-              description: "Type of report (App Store Connect API 4.3). SALES = downloads/revenue; SUBSCRIPTION = active subscriber snapshot; SUBSCRIPTION_EVENT = lifecycle events incl. cancellations/churn; SUBSCRIBER = detailed per-subscriber; INSTALLS = first-time/redownload/update installs; FIRST_ANNUAL = first-year subscriber conversions; WIN_BACK_ELIGIBILITY = win-back offer eligibility; SUBSCRIPTION_OFFER_CODE_REDEMPTION = offer-code redemptions.",
+              description: "Type of report (App Store Connect API 4.3). SALES = downloads/revenue; SUBSCRIPTION = active subscriber snapshot; SUBSCRIPTION_EVENT = lifecycle events incl. cancellations/churn; SUBSCRIBER = detailed per-subscriber; INSTALLS = EU DMA 'First Annual Installs' / Core Technology Fee report (MONTHLY-only, EU region — NOT app downloads); FIRST_ANNUAL = first-year subscriber conversions; WIN_BACK_ELIGIBILITY = win-back offer eligibility; SUBSCRIPTION_OFFER_CODE_REDEMPTION = offer-code redemptions.",
               default: "SALES"
             },
             reportSubType: {

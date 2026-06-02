@@ -87,7 +87,7 @@ export class AnalyticsHandlers {
             SUBSCRIPTION_EVENT: "1_4",
             SUBSCRIBER: "1_4",
             SUBSCRIPTION_OFFER_CODE_REDEMPTION: "1_0", // 4.3; unverified (returns "invalid vendor number" — not enabled for this account)
-            INSTALLS: "1_2", // 4.3; Apple reports latest = 1_2
+            INSTALLS: "1_2", // 4.3; EU DMA "First Annual Installs" / Core Technology Fee report (MONTHLY-only, EU region) — NOT a downloads source. Latest version = 1_2
             FIRST_ANNUAL: "1_0", // 4.3; unverified (no data to validate against — override if Apple rejects)
             WIN_BACK_ELIGIBILITY: "1_0", // 4.3; verified live (latest = 1_0, returns rows)
             NEWSSTAND: "1_0",

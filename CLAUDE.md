@@ -69,7 +69,7 @@ Apple requires a report **`version`** and accepts only specific values per repor
 | `SUBSCRIPTION` | `1_4` | active-subscriber snapshot (churn base); DAILY-only |
 | `SUBSCRIPTION_EVENT` | `1_4` | lifecycle/churn events; DAILY-only. Has `Original Start Date` → enables a **trial→paid cohort** |
 | `SUBSCRIBER` | `1_4` | per-subscriber detail; DAILY-only |
-| `INSTALLS` | `1_2` | **4.3**; first-time/redownload/update installs w/ territory+channel+install-type pivots — cleaner than parsing `SALES` product types |
+| `INSTALLS` | `1_2` | **4.3**; **EU DMA "First Annual Installs" / Core Technology Fee** report — MONTHLY-only, EU region, rolling 12-mo install count above the 1M threshold. **NOT app downloads** (the name is misleading). For downloads use `SALES` product type `1F`. The `SUMMARY_TERRITORY/CHANNEL/INSTALL_TYPE` subtypes mostly 404 here. |
 | `WIN_BACK_ELIGIBILITY` | `1_0` | **4.3**; verified (returns rows) |
 | `FIRST_ANNUAL` | `1_0` | **4.3**; *unverified* (no data to validate) |
 | `SUBSCRIPTION_OFFER_CODE_REDEMPTION` | `1_0` | **4.3**; *unverified* — this account returns "invalid vendor number" (likely not enabled) |
