@@ -82,19 +82,29 @@ export class AppStoreConnectClient {
     return { data: text };
   }
 
+  /**
+   * Download an analytics report segment. The segment `url` is a pre-signed S3
+   * URL (it already carries `X-Amz-Signature`/`X-Amz-Credential` query params),
+   * so we must NOT attach an `Authorization` header — S3 rejects requests that
+   * present two auth mechanisms with 400 Bad Request. The body is a gzipped CSV
+   * (`.csv.gz`), so fetch it as binary and gunzip it explicitly.
+   */
   async downloadFromUrl(url: string): Promise<any> {
-    const token = await this.authService.generateToken();
-    
     const response = await axios.get(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      responseType: 'arraybuffer'
     });
 
+    const buf = Buffer.from(response.data);
+    // Gunzip when the body is gzip (magic bytes 0x1f 0x8b); fall back to raw
+    // text otherwise (e.g. an uncompressed error payload).
+    const data = (buf[0] === 0x1f && buf[1] === 0x8b)
+      ? gunzipSync(buf).toString('utf-8')
+      : buf.toString('utf-8');
+
     return {
-      data: response.data,
+      data,
       contentType: response.headers['content-type'],
-      size: response.headers['content-length']
+      size: response.headers['content-length'] ?? String(buf.length)
     };
   }
 }
