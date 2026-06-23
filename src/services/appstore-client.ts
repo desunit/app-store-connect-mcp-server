@@ -61,16 +61,42 @@ export class AppStoreConnectClient {
   async getGzipReport(url: string, params?: Record<string, any>): Promise<{ data: string }> {
     const token = await this.authService.generateToken();
 
-    const response = await this.axiosInstance.request<ArrayBuffer>({
-      method: 'GET',
-      url,
-      params,
-      responseType: 'arraybuffer',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/a-gzip'
+    let response;
+    try {
+      response = await this.axiosInstance.request<ArrayBuffer>({
+        method: 'GET',
+        url,
+        params,
+        responseType: 'arraybuffer',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/a-gzip'
+        }
+      });
+    } catch (error) {
+      // On a non-2xx, Apple returns a JSON error body (uncompressed) explaining
+      // the cause — bad vendor number, no report for that date/region, key lacks
+      // Finance/Sales access, etc. But because we asked for `arraybuffer`, that
+      // body arrives as binary, so the generic handler's `error.response.data
+      // .errors[0].detail` lookup misses it and only "status code 400" surfaces.
+      // Decode it here and re-throw the real message.
+      if (axios.isAxiosError(error) && error.response?.data) {
+        const ebuf = Buffer.from(error.response.data as ArrayBuffer);
+        const body = (ebuf[0] === 0x1f && ebuf[1] === 0x8b)
+          ? gunzipSync(ebuf).toString('utf-8')
+          : ebuf.toString('utf-8');
+        let detail = body;
+        try {
+          const json = JSON.parse(body);
+          detail = (json?.errors ?? [])
+            .map((e: any) => [e.title, e.detail].filter(Boolean).join(': '))
+            .filter(Boolean)
+            .join(' | ') || body;
+        } catch { /* not JSON — keep the raw body */ }
+        throw new Error(`App Store Connect report error (HTTP ${error.response.status}): ${detail}`);
       }
-    });
+      throw error;
+    }
 
     const buf = Buffer.from(response.data);
     // The body is gzip (magic bytes 0x1f 0x8b). Guard in case Apple ever

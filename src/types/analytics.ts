@@ -152,4 +152,5 @@ export interface FinanceReportFilters {
   reportDate: string;
   regionCode: string;
   vendorNumber: string;
+  reportType: string;
 }

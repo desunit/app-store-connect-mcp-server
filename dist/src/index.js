@@ -909,11 +909,17 @@ class AppStoreConnectServer {
                         },
                         reportDate: {
                             type: "string",
-                            description: "Report date in YYYY-MM format (e.g., '2024-01')"
+                            description: "Fiscal report date in YYYY-MM format (Apple FISCAL month, not calendar; e.g. '2026-03' ~ Nov 30–Dec 27, 2025)"
                         },
                         regionCode: {
                             type: "string",
-                            description: "Region code (e.g., 'Z1' for worldwide, 'WW' for Europe)"
+                            description: "Region code. 'ZZ' = all regions consolidated, 'EU' = euro-zone; per-country codes (US, JP, GB, …) also work. Empty regions return HTTP 404."
+                        },
+                        reportType: {
+                            type: "string",
+                            description: "Required by Apple. 'FINANCIAL' (fiscal-month financial report, default) or 'FINANCE_DETAIL'.",
+                            enum: ["FINANCIAL", "FINANCE_DETAIL"],
+                            default: "FINANCIAL"
                         }
                     },
                     required: ["reportDate", "regionCode"]

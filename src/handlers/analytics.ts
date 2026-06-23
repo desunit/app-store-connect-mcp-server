@@ -162,7 +162,7 @@ export class AnalyticsHandlers {
     // (reportType, version) pairs. Pick a sensible default per type
     // unless the caller overrides it. Subscription reports are DAILY-only.
     const defaultVersion: Record<string, string> = {
-      SALES: "1_1",
+      SALES: "1_0",               // 4.3; Apple rejects 1_1 ("latest version for this report is 1_0")
       SUBSCRIPTION: "1_4",
       SUBSCRIPTION_EVENT: "1_4",
       SUBSCRIBER: "1_4",
@@ -190,19 +190,24 @@ export class AnalyticsHandlers {
     vendorNumber?: string;
     reportDate: string;
     regionCode: string;
+    reportType?: string;
   }): Promise<FinanceReportResponse> {
-    const { vendorNumber = this.config?.vendorNumber, reportDate, regionCode } = args;
-    
+    const { vendorNumber = this.config?.vendorNumber, reportDate, regionCode, reportType = "FINANCIAL" } = args;
+
     if (!vendorNumber) {
       throw new Error('Vendor number is required. Please provide it as an argument or set APP_STORE_CONNECT_VENDOR_NUMBER environment variable.');
     }
-    
+
     validateRequired({ reportDate, regionCode }, ['reportDate', 'regionCode']);
 
+    // Apple's /financeReports endpoint REQUIRES filter[reportType]; omitting it
+    // returns HTTP 400 "The parameter 'filter[reportType]' is required". Valid
+    // values: FINANCIAL (fiscal-month financial report) and FINANCE_DETAIL.
     const filters: FinanceReportFilters = {
       reportDate,
       regionCode,
-      vendorNumber
+      vendorNumber,
+      reportType
     };
 
     return this.client.getGzipReport('/financeReports', buildFilterParams(filters));
