@@ -50,6 +50,22 @@ export class AnalyticsHandlers {
     return this.client.post<AnalyticsReportRequestResponse>('/analyticsReportRequests', requestBody);
   }
 
+  // Apple 409s on creating a second request of the same accessType ("already
+  // have such an entity"), and a ONE_TIME_SNAPSHOT's instances/segments expire
+  // over time — leaving a stale request that lists 0 instances and cannot be
+  // refreshed. Deleting it is the only way to then re-create a fresh snapshot.
+  // DELETE /analyticsReportRequests/{id} returns 204 (no body).
+  async deleteAnalyticsReportRequest(args: {
+    reportRequestId: string;
+  }): Promise<{ success: true; deletedReportRequestId: string }> {
+    const { reportRequestId } = args;
+
+    validateRequired(args, ['reportRequestId']);
+
+    await this.client.delete(`/analyticsReportRequests/${reportRequestId}`);
+    return { success: true, deletedReportRequestId: reportRequestId };
+  }
+
   // Apple forbids GET_COLLECTION on /analyticsReportRequests, so the only way
   // to recover an existing request's ID (create just 409s "already have such
   // an entity") is via the app -> requests relationship.

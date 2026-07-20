@@ -720,6 +720,20 @@ class AppStoreConnectServer {
                 }
             },
             {
+                name: "delete_analytics_report_request",
+                description: "Delete an analytics report request by ID (DELETE /analyticsReportRequests/{id}). Use this to clear a stale ONE_TIME_SNAPSHOT whose instances have expired (lists 0 instances) so a fresh snapshot can be created — Apple 409s on creating a second request of the same accessType while one exists. Irreversible; the ONGOING request should normally be kept.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        reportRequestId: {
+                            type: "string",
+                            description: "The ID of the analytics report request to delete (from list_analytics_report_requests)"
+                        }
+                    },
+                    required: ["reportRequestId"]
+                }
+            },
+            {
                 name: "list_analytics_report_requests",
                 description: "List existing analytics report requests for an app (with their IDs and accessType). Use this to recover a reportRequestId — Apple does not allow listing the requests collection directly, and create just errors if one already exists.",
                 inputSchema: {
@@ -1009,6 +1023,8 @@ class AppStoreConnectServer {
                     // Analytics & Reports
                     case "create_analytics_report_request":
                         return formatResponse(await this.analyticsHandlers.createAnalyticsReportRequest(args));
+                    case "delete_analytics_report_request":
+                        return formatResponse(await this.analyticsHandlers.deleteAnalyticsReportRequest(args));
                     case "list_analytics_report_requests":
                         return formatResponse(await this.analyticsHandlers.listAnalyticsReportRequests(args));
                     case "list_analytics_reports":
