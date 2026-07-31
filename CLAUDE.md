@@ -49,6 +49,17 @@ Keep this list current: when you discover an Apple-API quirk that cost real debu
 
 ### Analytics Reports API (`AnalyticsHandlers`)
 The data chain is **request → reports → instances → segments → download**, and several steps have non-obvious constraints:
+- **`ONE_TIME_SNAPSHOT` DOES reconstruct the past — it is not "from now on".** This is the single easiest thing to get wrong, and getting it wrong makes you wrongly report that a metric is unavailable via the API. Verified live 2026-07-31 (app `586097063`):
+  - `ONE_TIME_SNAPSHOT` → **one instance per granularity**, all stamped with the snapshot's `processingDate`; the segment CSV inside holds the whole daily back-catalogue. The snapshot checked spanned **2024-01-01 → 2026-07-10, 922 distinct days**.
+  - `ONGOING` → accrues **forward only**, one instance per processing date. It can never recover days before the request existed.
+  - So "what was the metric *before* X?" is answered by creating a `ONE_TIME_SNAPSHOT`, not by lamenting that no request existed at the time. Create both (snapshot for history, ongoing for the future).
+  - Corollary: **one `DAILY` instance ≠ one day of data.** On a snapshot it is the entire series.
+- **An empty `list_analytics_report_requests` means nobody ever created a request for that app** — not that analytics are unavailable. The remedy is `create_analytics_report_request`, and history is still recoverable.
+- **Product-page funnel (impressions → product page views → downloads → conversion) IS in the API**, despite there being no report literally named "conversion rate": `APP_STORE_ENGAGEMENT` → **`App Store Discovery and Engagement Standard`** (`Detailed` adds source/territory breakdown). Columns: `Date, App Name, App Apple Identifier, Event, Page Type, Source Type, Engagement Type, Device, Platform Version, Territory, Counts, Unique Counts`, where `Event` ∈ {`Impression`, `Product Page View`, …}. Compute CVR against `COMMERCE` → `App Downloads Standard`. (This is distinct from the *cohort* download→paid report, which genuinely is UI-only — see below.)
+- **Every collection is paged and the tail is silently dropped if you don't follow `links.next`.** Apple caps `limit` at **200** (`limit=201` → 400 "The maximum allowable limit is '200'"). A report request exposes **~156 reports**, so the old `limit = 100` default returned 100 and hid 56 with no error — indistinguishable from "the API doesn't have it". `AppStoreConnectClient.getAllPages()` now follows `links.next` for requests/reports/instances/segments; `limit` is the **page size**, and `meta.paging` is annotated with `returned` / `pagesFetched` / `truncated`. Reuse `getAllPages` for any new list endpoint.
+- **`filter[name]` works on `/reports`** (exact match) — the quickest way to jump straight to one report instead of paging 156. Exposed as `filter.name` on `list_analytics_reports`.
+- **An instance's rows are SPLIT across its segments.** The snapshot's DAILY engagement instance had **2** segments; segment[0] alone was a partial series (200k rows). Always download and concatenate **all** segments before computing anything.
+- **`analyticsReports.attributes.instancesCount` is never populated** — Apple returned `undefined` for all 156 reports. Typed optional; use `list_analytics_report_instances` instead.
 - **You cannot list report requests.** Apple forbids `GET_COLLECTION` on `/analyticsReportRequests` (allowed ops: CREATE, DELETE, GET_INSTANCE), and `create` returns **409 "You already have such an entity"** if one already exists for that app+accessType — *without* returning the existing id. Recover the id via the app relationship `GET /apps/{appId}/analyticsReportRequests` → tool `list_analytics_report_requests`. There is one request entity per `accessType` (`ONGOING`, `ONE_TIME_SNAPSHOT`).
 - **Segments hang off an instance, not a report.** `GET /analyticsReports/{id}/segments` 404s (`relationship 'segments' ...`). Correct path: `list_analytics_report_instances` (`/analyticsReports/{id}/instances`, one instance per granularity+processingDate) → `list_analytics_report_segments` (`/analyticsReportInstances/{instanceId}/segments`).
 - **`filter[category]` values are singular: `COMMERCE`, `FRAMEWORK_USAGE`** — `APP_STORE_COMMERCE` / `FRAMEWORKS_USAGE` return **400 PARAMETER_ERROR**. Valid set: `APP_STORE_ENGAGEMENT`, `APP_USAGE`, `COMMERCE`, `FRAMEWORK_USAGE`, `PERFORMANCE` (the `AnalyticsReportCategory` type mirrors these).
@@ -76,7 +87,7 @@ Apple requires a report **`version`** and accepts only specific values per repor
 
 | reportType | version | notes |
 |---|---|---|
-| `SALES` | `1_1` | downloads/revenue; `Product Type Identifier` `1F`=first-time free dl, `3F`=redownload, `7F`=update |
+| `SALES` | `1_0` | downloads/revenue; `Product Type Identifier` `1F`=first-time free dl, `3F`=redownload, `7F`=update. **`1_1` is rejected** ("the latest version for this report is 1_0") — re-verified live 2026-07-31; the table previously said `1_1` and disagreed with the code |
 | `SUBSCRIPTION` | `1_4` | active-subscriber snapshot (churn base); DAILY-only |
 | `SUBSCRIPTION_EVENT` | `1_4` | lifecycle/churn events; DAILY-only. Has `Original Start Date` → enables a **trial→paid cohort** |
 | `SUBSCRIBER` | `1_4` | per-subscriber detail; DAILY-only |

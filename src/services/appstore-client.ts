@@ -37,6 +37,57 @@ export class AppStoreConnectClient {
     return this.request<T>('GET', url, undefined, params);
   }
 
+  /**
+   * GET a paged collection and follow `links.next` until exhausted.
+   *
+   * Apple caps `limit` at 200 per page and returns the rest behind a cursor.
+   * A single `get()` therefore silently drops records whenever
+   * `meta.paging.total` exceeds the page size — e.g. an analytics report
+   * request exposes ~156 reports, so the old default of `limit=100` returned
+   * 100 and hid 56 with no error. That looks identical to "the API doesn't
+   * have it" and is how capabilities get wrongly written off.
+   *
+   * `links.next` is an absolute URL that already carries the cursor + limit,
+   * so it is passed as `url` with NO extra params (axios ignores `baseURL`
+   * for absolute URLs; re-sending `params` would duplicate the query string).
+   *
+   * `meta.paging.returned` / `pagesFetched` / `truncated` are added so a
+   * caller can always tell a complete result from a capped one.
+   */
+  async getAllPages<T = any>(url: string, params?: Record<string, any>, maxPages = 50): Promise<T> {
+    const first = await this.request<any>('GET', url, undefined, params);
+
+    // Not a collection response — hand it back untouched.
+    if (!Array.isArray(first?.data)) return first as T;
+
+    const merged: any[] = [...first.data];
+    let next: string | undefined = first.links?.next;
+    let pagesFetched = 1;
+
+    while (next && pagesFetched < maxPages) {
+      const page = await this.request<any>('GET', next);
+      if (!Array.isArray(page?.data)) break;
+      merged.push(...page.data);
+      next = page.links?.next;
+      pagesFetched++;
+    }
+
+    return {
+      ...first,
+      data: merged,
+      links: { self: first.links?.self },
+      meta: {
+        ...(first.meta ?? {}),
+        paging: {
+          ...(first.meta?.paging ?? {}),
+          returned: merged.length,
+          pagesFetched,
+          truncated: Boolean(next)
+        }
+      }
+    } as T;
+  }
+
   async post<T = any>(url: string, data: any): Promise<T> {
     return this.request<T>('POST', url, data);
   }

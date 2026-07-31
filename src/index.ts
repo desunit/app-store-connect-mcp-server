@@ -730,7 +730,7 @@ class AppStoreConnectServer {
         // Analytics & Reports Tools
         {
           name: "create_analytics_report_request",
-          description: "Create a new analytics report request for an app",
+          description: "Create an analytics report request for an app. This is the gateway to App Store product-page metrics (impressions, product page views, downloads, conversion rate) via the APP_STORE_ENGAGEMENT report 'App Store Discovery and Engagement Standard/Detailed'. IMPORTANT — ONE_TIME_SNAPSHOT DOES reconstruct the past: it backfills the full daily history (a live snapshot covered 2.5 years / 922 days) into one instance per granularity. ONGOING only accrues forward from creation and can never recover earlier days. So a 'what was it before X?' question is answered by ONE_TIME_SNAPSHOT, not ONGOING. Creating both is normal. Instances appear asynchronously (hours to ~a day).",
           inputSchema: {
             type: "object",
             properties: {
@@ -741,7 +741,7 @@ class AppStoreConnectServer {
               accessType: {
                 type: "string",
                 enum: ["ONGOING", "ONE_TIME_SNAPSHOT"],
-                description: "Access type for the analytics report (ONGOING for daily data, ONE_TIME_SNAPSHOT for historical data)",
+                description: "ONE_TIME_SNAPSHOT = one-off backfill of the full historical daily series (use this to reconstruct the past). ONGOING = daily reports accruing from creation forward only (no history).",
                 default: "ONE_TIME_SNAPSHOT"
               }
             },
@@ -764,7 +764,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_report_requests",
-          description: "List existing analytics report requests for an app (with their IDs and accessType). Use this to recover a reportRequestId — Apple does not allow listing the requests collection directly, and create just errors if one already exists.",
+          description: "List existing analytics report requests for an app (with their IDs and accessType). Use this to recover a reportRequestId — Apple does not allow listing the requests collection directly, and create just errors if one already exists. An empty result means NO request has ever been created for this app — it does NOT mean analytics are unavailable. Fix it by calling create_analytics_report_request (ONE_TIME_SNAPSHOT backfills history).",
           inputSchema: {
             type: "object",
             properties: {
@@ -774,7 +774,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of requests to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               }
@@ -784,7 +784,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_reports",
-          description: "Get available analytics reports for a specific report request",
+          description: "Get available analytics reports for a report request (~156 exist per request; all pages are fetched automatically). For App Store product-page funnel metrics — impressions, product page views, downloads, conversion rate — use filter.category=APP_STORE_ENGAGEMENT and pick 'App Store Discovery and Engagement Standard' (or 'Detailed' for the traffic-source/territory breakdown). Downloads also live in COMMERCE -> 'App Downloads Standard/Detailed'.",
           inputSchema: {
             type: "object",
             properties: {
@@ -794,7 +794,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of reports to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               },
@@ -804,7 +804,11 @@ class AppStoreConnectServer {
                   category: {
                     type: "string",
                     enum: ["APP_STORE_ENGAGEMENT", "COMMERCE", "APP_USAGE", "FRAMEWORK_USAGE", "PERFORMANCE"],
-                    description: "Filter by report category (COMMERCE = downloads/purchases/subscriptions)"
+                    description: "Filter by report category (APP_STORE_ENGAGEMENT = impressions/product page views/conversion; COMMERCE = downloads/purchases/subscriptions)"
+                  },
+                  name: {
+                    type: "string",
+                    description: "Exact report name, e.g. 'App Store Discovery and Engagement Standard'. Apple matches this exactly (filter[name]) — fastest way to jump straight to one report."
                   }
                 }
               }
@@ -814,7 +818,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_report_instances",
-          description: "Get instances of an analytics report. Each instance is one (granularity, processingDate) snapshot; segments hang off an instance. Instances are generated asynchronously after the request is created (hours to ~a day) — an empty list means not ready yet.",
+          description: "Get instances of an analytics report. Each instance is one (granularity, processingDate); segments hang off an instance. Instances are generated asynchronously after the request is created (hours to ~a day) — an empty list means not ready yet, not 'no data'. On a ONE_TIME_SNAPSHOT there is only ONE instance per granularity and its segments contain the ENTIRE historical daily series (do not mistake one DAILY instance for one day of data). On an ONGOING request instances accumulate one per processing date.",
           inputSchema: {
             type: "object",
             properties: {
@@ -824,7 +828,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of instances to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               },
@@ -848,7 +852,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_report_segments",
-          description: "Get segments for a specific analytics report INSTANCE (contains the download URLs). Pass an instanceId from list_analytics_report_instances, not a reportId.",
+          description: "Get segments for a specific analytics report INSTANCE (contains the download URLs). Pass an instanceId from list_analytics_report_instances, not a reportId. An instance's rows are SPLIT across its segments — download and concatenate ALL of them; a single segment is a partial series.",
           inputSchema: {
             type: "object",
             properties: {
@@ -858,7 +862,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of segments to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               }
@@ -868,7 +872,7 @@ class AppStoreConnectServer {
         },
         {
           name: "download_analytics_report_segment",
-          description: "Download data from an analytics report segment URL",
+          description: "Download data from an analytics report segment URL. Returns gunzipped CSV/TSV — these are large (hundreds of thousands of rows); prefer piping to a script over reading whole. The App Store Discovery and Engagement columns are: Date, App Name, App Apple Identifier, Event (Impression / Product Page View / ...), Page Type, Source Type, Engagement Type, Device, Platform Version, Territory, Counts, Unique Counts.",
           inputSchema: {
             type: "object",
             properties: {

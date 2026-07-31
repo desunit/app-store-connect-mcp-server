@@ -28,6 +28,54 @@ export class AppStoreConnectClient {
     async get(url, params) {
         return this.request('GET', url, undefined, params);
     }
+    /**
+     * GET a paged collection and follow `links.next` until exhausted.
+     *
+     * Apple caps `limit` at 200 per page and returns the rest behind a cursor.
+     * A single `get()` therefore silently drops records whenever
+     * `meta.paging.total` exceeds the page size — e.g. an analytics report
+     * request exposes ~156 reports, so the old default of `limit=100` returned
+     * 100 and hid 56 with no error. That looks identical to "the API doesn't
+     * have it" and is how capabilities get wrongly written off.
+     *
+     * `links.next` is an absolute URL that already carries the cursor + limit,
+     * so it is passed as `url` with NO extra params (axios ignores `baseURL`
+     * for absolute URLs; re-sending `params` would duplicate the query string).
+     *
+     * `meta.paging.returned` / `pagesFetched` / `truncated` are added so a
+     * caller can always tell a complete result from a capped one.
+     */
+    async getAllPages(url, params, maxPages = 50) {
+        const first = await this.request('GET', url, undefined, params);
+        // Not a collection response — hand it back untouched.
+        if (!Array.isArray(first?.data))
+            return first;
+        const merged = [...first.data];
+        let next = first.links?.next;
+        let pagesFetched = 1;
+        while (next && pagesFetched < maxPages) {
+            const page = await this.request('GET', next);
+            if (!Array.isArray(page?.data))
+                break;
+            merged.push(...page.data);
+            next = page.links?.next;
+            pagesFetched++;
+        }
+        return {
+            ...first,
+            data: merged,
+            links: { self: first.links?.self },
+            meta: {
+                ...(first.meta ?? {}),
+                paging: {
+                    ...(first.meta?.paging ?? {}),
+                    returned: merged.length,
+                    pagesFetched,
+                    truncated: Boolean(next)
+                }
+            }
+        };
+    }
     async post(url, data) {
         return this.request('POST', url, data);
     }

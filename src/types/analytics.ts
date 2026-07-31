@@ -60,7 +60,30 @@ export interface AnalyticsReport {
   attributes: {
     category: AnalyticsReportCategory;
     name: string;
-    instancesCount: number;
+    // Apple does not populate this on /reports (verified live 2026-07-31 —
+    // every row came back `undefined`). Optional so callers don't branch on
+    // a value that is never there; use list_analytics_report_instances instead.
+    instancesCount?: number;
+  };
+}
+
+// Apple pages every collection (max limit 200) and returns the remainder
+// behind `links.next`. `getAllPages` follows it and annotates `meta.paging`
+// with `returned` / `pagesFetched` / `truncated` so a capped result is
+// distinguishable from a complete one.
+export interface PagedResponseMeta {
+  links?: {
+    self?: string;
+    next?: string;
+  };
+  meta?: {
+    paging?: {
+      total?: number;
+      limit?: number;
+      returned?: number;
+      pagesFetched?: number;
+      truncated?: boolean;
+    };
   };
 }
 
@@ -92,19 +115,19 @@ export interface AnalyticsReportRequestSummary {
   };
 }
 
-export interface ListAnalyticsReportRequestsResponse {
+export interface ListAnalyticsReportRequestsResponse extends PagedResponseMeta {
   data: AnalyticsReportRequestSummary[];
 }
 
-export interface ListAnalyticsReportsResponse {
+export interface ListAnalyticsReportsResponse extends PagedResponseMeta {
   data: AnalyticsReport[];
 }
 
-export interface ListAnalyticsReportInstancesResponse {
+export interface ListAnalyticsReportInstancesResponse extends PagedResponseMeta {
   data: AnalyticsReportInstance[];
 }
 
-export interface ListAnalyticsReportSegmentsResponse {
+export interface ListAnalyticsReportSegmentsResponse extends PagedResponseMeta {
   data: AnalyticsReportSegment[];
 }
 
@@ -145,7 +168,7 @@ export interface SalesReportFilters {
   reportSubType: SalesReportSubType;
   frequency: SalesReportFrequency;
   vendorNumber: string;
-  version?: string; // Report version, e.g. '1_4' for SUBSCRIPTION/SUBSCRIPTION_EVENT, '1_1' for SALES
+  version?: string; // Report version, e.g. '1_4' for SUBSCRIPTION/SUBSCRIPTION_EVENT, '1_0' for SALES (1_1 is rejected)
 }
 
 export interface FinanceReportFilters {

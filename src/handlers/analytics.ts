@@ -22,6 +22,22 @@ import { validateRequired, sanitizeLimit, buildFilterParams } from '../utils/ind
 export class AnalyticsHandlers {
   constructor(private client: AppStoreConnectClient, private config?: { vendorNumber?: string }) {}
 
+  // accessType decides what WINDOW of data you get, and the two are not
+  // interchangeable (verified live 2026-07-31 against app 586097063):
+  //
+  //   ONE_TIME_SNAPSHOT — backfills HISTORY. Apple emits one instance per
+  //     granularity, all stamped with the snapshot's processingDate; the
+  //     segment CSV inside holds the full daily back-catalogue. The live
+  //     snapshot checked covered 2024-01-01 -> 2026-07-10 (922 distinct days)
+  //     in a single DAILY instance. This is the ONLY way to reconstruct the
+  //     past, and it is why "the analytics API can't look backwards" is wrong.
+  //   ONGOING — accrues FORWARD from creation, one instance per processing
+  //     date. It cannot recover data from before the request existed.
+  //
+  // Practical rule: to answer a "what was it before X?" question, create a
+  // ONE_TIME_SNAPSHOT (and create an ONGOING alongside it for future days).
+  // Instances are generated asynchronously — hours to ~a day — so an empty
+  // instance list right after creation means "not ready", not "no data".
   async createAnalyticsReportRequest(args: {
     appId: string;
     accessType?: AnalyticsAccessType;
@@ -77,20 +93,27 @@ export class AnalyticsHandlers {
 
     validateRequired(args, ['appId']);
 
-    return this.client.get<ListAnalyticsReportRequestsResponse>(`/apps/${appId}/analyticsReportRequests`, {
+    return this.client.getAllPages<ListAnalyticsReportRequestsResponse>(`/apps/${appId}/analyticsReportRequests`, {
       limit: sanitizeLimit(limit)
     });
   }
 
+  // ~156 reports hang off a single request, so the old `limit = 100` default
+  // returned 100 and silently dropped 56. `limit` is now the PAGE size and
+  // every page is followed; pass `filter.name` (Apple supports exact-match
+  // filter[name]) or `filter.category` to narrow instead of relying on luck.
+  // Product-page conversion lives in APP_STORE_ENGAGEMENT ->
+  // "App Store Discovery and Engagement Standard/Detailed".
   async listAnalyticsReports(args: {
     reportRequestId: string;
     limit?: number;
     filter?: {
       category?: AnalyticsReportCategory;
+      name?: string;
     };
   }): Promise<ListAnalyticsReportsResponse> {
-    const { reportRequestId, limit = 100, filter } = args;
-    
+    const { reportRequestId, limit = 200, filter } = args;
+
     validateRequired(args, ['reportRequestId']);
 
     const params: Record<string, any> = {
@@ -99,12 +122,18 @@ export class AnalyticsHandlers {
 
     Object.assign(params, buildFilterParams(filter));
 
-    return this.client.get<ListAnalyticsReportsResponse>(`/analyticsReportRequests/${reportRequestId}/reports`, params);
+    return this.client.getAllPages<ListAnalyticsReportsResponse>(`/analyticsReportRequests/${reportRequestId}/reports`, params);
   }
 
   // A report has one instance per (granularity, processingDate). Apple
   // generates instances asynchronously after the request is created
   // (hours -> ~a day), so an empty list means "not ready yet", not "no data".
+  //
+  // Do NOT read "one DAILY instance" as "one day of data": on a
+  // ONE_TIME_SNAPSHOT the single DAILY instance carries the whole historical
+  // daily series inside its segments (see createAnalyticsReportRequest).
+  // On an ONGOING request instances accumulate one per day, which is what
+  // makes following `links.next` mandatory here past ~200 days.
   async listAnalyticsReportInstances(args: {
     reportId: string;
     limit?: number;
@@ -113,7 +142,7 @@ export class AnalyticsHandlers {
       processingDate?: string;
     };
   }): Promise<ListAnalyticsReportInstancesResponse> {
-    const { reportId, limit = 100, filter } = args;
+    const { reportId, limit = 200, filter } = args;
 
     validateRequired(args, ['reportId']);
 
@@ -123,20 +152,24 @@ export class AnalyticsHandlers {
 
     Object.assign(params, buildFilterParams(filter));
 
-    return this.client.get<ListAnalyticsReportInstancesResponse>(`/analyticsReports/${reportId}/instances`, params);
+    return this.client.getAllPages<ListAnalyticsReportInstancesResponse>(`/analyticsReports/${reportId}/instances`, params);
   }
 
   // Segments hang off an *instance*, not the report. The old
   // /analyticsReports/{id}/segments path 404s ("relationship 'segments' ...").
+  //
+  // An instance's data is SPLIT across its segments — the live snapshot
+  // checked had 2, and segment[0] alone was a partial series. Always download
+  // and concatenate every segment before drawing conclusions from the rows.
   async listAnalyticsReportSegments(args: {
     instanceId: string;
     limit?: number;
   }): Promise<ListAnalyticsReportSegmentsResponse> {
-    const { instanceId, limit = 100 } = args;
+    const { instanceId, limit = 200 } = args;
 
     validateRequired(args, ['instanceId']);
 
-    return this.client.get<ListAnalyticsReportSegmentsResponse>(`/analyticsReportInstances/${instanceId}/segments`, {
+    return this.client.getAllPages<ListAnalyticsReportSegmentsResponse>(`/analyticsReportInstances/${instanceId}/segments`, {
       limit: sanitizeLimit(limit)
     });
   }
