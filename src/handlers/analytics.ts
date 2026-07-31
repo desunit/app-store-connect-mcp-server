@@ -17,7 +17,7 @@ import {
   SalesReportFilters,
   FinanceReportFilters
 } from '../types/index.js';
-import { validateRequired, sanitizeLimit, buildFilterParams } from '../utils/index.js';
+import { validateRequired, sanitizeLimit, buildFilterParams, buildFieldParams } from '../utils/index.js';
 
 export class AnalyticsHandlers {
   constructor(private client: AppStoreConnectClient, private config?: { vendorNumber?: string }) {}
@@ -104,6 +104,13 @@ export class AnalyticsHandlers {
   // filter[name]) or `filter.category` to narrow instead of relying on luck.
   // Product-page conversion lives in APP_STORE_ENGAGEMENT ->
   // "App Store Discovery and Engagement Standard/Detailed".
+  //
+  // Returning all 156 makes payload size the new failure mode (89 KB raw /
+  // ~116 KB pretty-printed blew the MCP output cap), so the response is
+  // slimmed two ways: a sparse fieldset (`name`,`category` are the only
+  // attributes that exist) halves it, and the per-item `links`/`relationships`
+  // boilerplate is stripped — every downstream call keys off `id`, which is
+  // retained. Net ~5x smaller with no loss of usable information.
   async listAnalyticsReports(args: {
     reportRequestId: string;
     limit?: number;
@@ -117,12 +124,21 @@ export class AnalyticsHandlers {
     validateRequired(args, ['reportRequestId']);
 
     const params: Record<string, any> = {
-      limit: sanitizeLimit(limit)
+      limit: sanitizeLimit(limit),
+      ...buildFieldParams({ analyticsReports: ['name', 'category'] })
     };
 
     Object.assign(params, buildFilterParams(filter));
 
-    return this.client.getAllPages<ListAnalyticsReportsResponse>(`/analyticsReportRequests/${reportRequestId}/reports`, params);
+    const result = await this.client.getAllPages<ListAnalyticsReportsResponse>(
+      `/analyticsReportRequests/${reportRequestId}/reports`,
+      params
+    );
+
+    return {
+      ...result,
+      data: (result.data ?? []).map(({ id, type, attributes }) => ({ id, type, attributes }))
+    };
   }
 
   // A report has one instance per (granularity, processingDate). Apple
