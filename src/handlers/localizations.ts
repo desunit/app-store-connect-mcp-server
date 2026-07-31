@@ -27,10 +27,9 @@ export class LocalizationHandlers {
     validateRequired(args, ['appId']);
     
     const params: Record<string, any> = {
-      limit: sanitizeLimit(limit),
-      'filter[app]': appId
+      limit: sanitizeLimit(limit)
     };
-    
+
     if (filter?.platform) {
       params['filter[platform]'] = filter.platform;
     }
@@ -43,8 +42,11 @@ export class LocalizationHandlers {
       params['filter[appStoreState]'] = filter.appStoreState;
     }
     
+    // Versions are only listable through the app relationship — there is no
+    // GET /v1/appStoreVersions collection root (only /v1/appStoreVersions/{id}),
+    // so a filter[app] query against the root returns 404 NOT_FOUND.
     return this.client.get<ListAppStoreVersionsResponse>(
-      '/appStoreVersions',
+      `/apps/${appId}/appStoreVersions`,
       params
     );
   }
@@ -58,12 +60,14 @@ export class LocalizationHandlers {
     validateRequired(args, ['appStoreVersionId']);
     
     const params: Record<string, any> = {
-      limit: sanitizeLimit(limit),
-      'filter[appStoreVersion]': appStoreVersionId
+      limit: sanitizeLimit(limit)
     };
-    
+
+    // Same as above: localizations are reachable only via the version
+    // relationship. GET /v1/appStoreVersionLocalizations (collection) does not
+    // exist — only the single-resource /{id} form does.
     return this.client.get<ListAppStoreVersionLocalizationsResponse>(
-      '/appStoreVersionLocalizations',
+      `/appStoreVersions/${appStoreVersionId}/appStoreVersionLocalizations`,
       params
     );
   }
