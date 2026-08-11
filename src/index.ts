@@ -444,6 +444,92 @@ class AppStoreConnectServer {
           }
         },
 
+        // App Info Localization Tools (app name + subtitle)
+        {
+          name: "list_app_infos",
+          description: "List the appInfo records for an app. An appInfo holds the name/subtitle localizations and the age ratings; an app usually has one, but can have a live record plus an editable draft.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              appId: {
+                type: "string",
+                description: "The ID of the app"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of appInfos to return (default: 100)",
+                minimum: 1,
+                maximum: 200
+              }
+            },
+            required: ["appId"]
+          }
+        },
+        {
+          name: "list_app_info_localizations",
+          description: "Get the app NAME and SUBTITLE per locale, plus privacy URLs. These do not live on appStoreVersionLocalizations (which carries description/keywords/whatsNew). Apple indexes name + subtitle + keywords together for search, so read this before editing a keyword field to avoid spending characters on words the name or subtitle already covers.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              appId: {
+                type: "string",
+                description: "The ID of the app. Resolves to its appInfo automatically, preferring the editable draft over the live record; the choice is reported back in meta.appInfo. Use this unless you already have an appInfoId."
+              },
+              appInfoId: {
+                type: "string",
+                description: "The ID of a specific appInfo (from list_app_infos). Takes precedence over appId."
+              },
+              locale: {
+                type: "string",
+                description: "Optional locale filter (e.g. 'en-US', 'de-DE', 'ja')"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of localizations to return (default: 100)",
+                minimum: 1,
+                maximum: 200
+              }
+            }
+          }
+        },
+        {
+          name: "get_app_info_localization",
+          description: "Get a single app info localization (name, subtitle, privacy URLs) by its ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              localizationId: {
+                type: "string",
+                description: "The ID of the app info localization"
+              }
+            },
+            required: ["localizationId"]
+          }
+        },
+        {
+          name: "update_app_info_localization",
+          description: "Update the app name, subtitle or a privacy URL for one locale. Name and subtitle are capped at 30 characters each and are validated before the request is sent. Only an editable appInfo accepts changes — a record in READY_FOR_DISTRIBUTION is rejected by Apple.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              localizationId: {
+                type: "string",
+                description: "The ID of the app info localization to update"
+              },
+              field: {
+                type: "string",
+                enum: ["name", "subtitle", "privacyPolicyUrl", "privacyChoicesUrl", "privacyPolicyText"],
+                description: "The field to update"
+              },
+              value: {
+                type: "string",
+                description: "The new value for the field (name and subtitle: 30 characters maximum)"
+              }
+            },
+            required: ["localizationId", "field", "value"]
+          }
+        },
+
         // Bundle ID Tools
         {
           name: "create_bundle_id",
@@ -730,7 +816,7 @@ class AppStoreConnectServer {
         // Analytics & Reports Tools
         {
           name: "create_analytics_report_request",
-          description: "Create a new analytics report request for an app",
+          description: "Create an analytics report request for an app. This is the gateway to App Store product-page metrics (impressions, product page views, downloads, conversion rate) via the APP_STORE_ENGAGEMENT report 'App Store Discovery and Engagement Standard/Detailed'. IMPORTANT — ONE_TIME_SNAPSHOT DOES reconstruct the past: it backfills the full daily history (a live snapshot covered 2.5 years / 922 days) into one instance per granularity. ONGOING only accrues forward from creation and can never recover earlier days. So a 'what was it before X?' question is answered by ONE_TIME_SNAPSHOT, not ONGOING. Creating both is normal. Instances appear asynchronously (hours to ~a day).",
           inputSchema: {
             type: "object",
             properties: {
@@ -741,7 +827,7 @@ class AppStoreConnectServer {
               accessType: {
                 type: "string",
                 enum: ["ONGOING", "ONE_TIME_SNAPSHOT"],
-                description: "Access type for the analytics report (ONGOING for daily data, ONE_TIME_SNAPSHOT for historical data)",
+                description: "ONE_TIME_SNAPSHOT = one-off backfill of the full historical daily series (use this to reconstruct the past). ONGOING = daily reports accruing from creation forward only (no history).",
                 default: "ONE_TIME_SNAPSHOT"
               }
             },
@@ -749,8 +835,22 @@ class AppStoreConnectServer {
           }
         },
         {
+          name: "delete_analytics_report_request",
+          description: "Delete an analytics report request by ID (DELETE /analyticsReportRequests/{id}). Use this to clear a stale ONE_TIME_SNAPSHOT whose instances have expired (lists 0 instances) so a fresh snapshot can be created — Apple 409s on creating a second request of the same accessType while one exists. Irreversible; the ONGOING request should normally be kept.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              reportRequestId: {
+                type: "string",
+                description: "The ID of the analytics report request to delete (from list_analytics_report_requests)"
+              }
+            },
+            required: ["reportRequestId"]
+          }
+        },
+        {
           name: "list_analytics_report_requests",
-          description: "List existing analytics report requests for an app (with their IDs and accessType). Use this to recover a reportRequestId — Apple does not allow listing the requests collection directly, and create just errors if one already exists.",
+          description: "List existing analytics report requests for an app (with their IDs and accessType). Use this to recover a reportRequestId — Apple does not allow listing the requests collection directly, and create just errors if one already exists. An empty result means NO request has ever been created for this app — it does NOT mean analytics are unavailable. Fix it by calling create_analytics_report_request (ONE_TIME_SNAPSHOT backfills history).",
           inputSchema: {
             type: "object",
             properties: {
@@ -760,7 +860,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of requests to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               }
@@ -770,7 +870,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_reports",
-          description: "Get available analytics reports for a specific report request",
+          description: "Get available analytics reports for a report request (~156 exist per request; all pages are fetched automatically). For App Store product-page funnel metrics — impressions, product page views, downloads, conversion rate — use filter.category=APP_STORE_ENGAGEMENT and pick 'App Store Discovery and Engagement Standard' (or 'Detailed' for the traffic-source/territory breakdown). Downloads also live in COMMERCE -> 'App Downloads Standard/Detailed'.",
           inputSchema: {
             type: "object",
             properties: {
@@ -780,7 +880,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of reports to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               },
@@ -790,7 +890,11 @@ class AppStoreConnectServer {
                   category: {
                     type: "string",
                     enum: ["APP_STORE_ENGAGEMENT", "COMMERCE", "APP_USAGE", "FRAMEWORK_USAGE", "PERFORMANCE"],
-                    description: "Filter by report category (COMMERCE = downloads/purchases/subscriptions)"
+                    description: "Filter by report category (APP_STORE_ENGAGEMENT = impressions/product page views/conversion; COMMERCE = downloads/purchases/subscriptions)"
+                  },
+                  name: {
+                    type: "string",
+                    description: "Exact report name, e.g. 'App Store Discovery and Engagement Standard'. Apple matches this exactly (filter[name]) — fastest way to jump straight to one report."
                   }
                 }
               }
@@ -800,7 +904,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_report_instances",
-          description: "Get instances of an analytics report. Each instance is one (granularity, processingDate) snapshot; segments hang off an instance. Instances are generated asynchronously after the request is created (hours to ~a day) — an empty list means not ready yet.",
+          description: "Get instances of an analytics report. Each instance is one (granularity, processingDate); segments hang off an instance. Instances are generated asynchronously after the request is created (hours to ~a day) — an empty list means not ready yet, not 'no data'. On a ONE_TIME_SNAPSHOT there is only ONE instance per granularity and its segments contain the ENTIRE historical daily series (do not mistake one DAILY instance for one day of data). On an ONGOING request instances accumulate one per processing date.",
           inputSchema: {
             type: "object",
             properties: {
@@ -810,7 +914,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of instances to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               },
@@ -834,7 +938,7 @@ class AppStoreConnectServer {
         },
         {
           name: "list_analytics_report_segments",
-          description: "Get segments for a specific analytics report INSTANCE (contains the download URLs). Pass an instanceId from list_analytics_report_instances, not a reportId.",
+          description: "Get segments for a specific analytics report INSTANCE (contains the download URLs). Pass an instanceId from list_analytics_report_instances, not a reportId. An instance's rows are SPLIT across its segments — download and concatenate ALL of them; a single segment is a partial series.",
           inputSchema: {
             type: "object",
             properties: {
@@ -844,7 +948,7 @@ class AppStoreConnectServer {
               },
               limit: {
                 type: "number",
-                description: "Maximum number of segments to return (default: 100)",
+                description: "Page size per API call (default 200, Apple max 200). All pages are followed automatically; see meta.paging.returned/truncated.",
                 minimum: 1,
                 maximum: 200
               }
@@ -854,7 +958,7 @@ class AppStoreConnectServer {
         },
         {
           name: "download_analytics_report_segment",
-          description: "Download data from an analytics report segment URL",
+          description: "Download data from an analytics report segment URL. Returns gunzipped CSV/TSV — these are large (hundreds of thousands of rows); prefer piping to a script over reading whole. The App Store Discovery and Engagement columns are: Date, App Name, App Apple Identifier, Event (Impression / Product Page View / ...), Page Type, Source Type, Engagement Type, Device, Platform Version, Territory, Counts, Unique Counts.",
           inputSchema: {
             type: "object",
             properties: {
@@ -940,11 +1044,17 @@ class AppStoreConnectServer {
             },
             reportDate: {
               type: "string",
-              description: "Report date in YYYY-MM format (e.g., '2024-01')"
+              description: "Fiscal report date in YYYY-MM format (Apple FISCAL month, not calendar; e.g. '2026-03' ~ Nov 30–Dec 27, 2025)"
             },
             regionCode: {
               type: "string",
-              description: "Region code (e.g., 'Z1' for worldwide, 'WW' for Europe)"
+              description: "Region code. 'ZZ' = all regions consolidated, 'EU' = euro-zone; per-country codes (US, JP, GB, …) also work. Empty regions return HTTP 404."
+            },
+            reportType: {
+              type: "string",
+              description: "Required by Apple. 'FINANCIAL' (fiscal-month financial report, default) or 'FINANCE_DETAIL'.",
+              enum: ["FINANCIAL", "FINANCE_DETAIL"],
+              default: "FINANCIAL"
             }
           },
           required: ["reportDate", "regionCode"]
@@ -1033,6 +1143,19 @@ class AppStoreConnectServer {
           case "update_app_store_version_localization":
             return formatResponse(await this.localizationHandlers.updateAppStoreVersionLocalization(args as any));
 
+          // App Info Localizations (name + subtitle)
+          case "list_app_infos":
+            return formatResponse(await this.localizationHandlers.listAppInfos(args as any));
+
+          case "list_app_info_localizations":
+            return formatResponse(await this.localizationHandlers.listAppInfoLocalizations(args as any));
+
+          case "get_app_info_localization":
+            return formatResponse(await this.localizationHandlers.getAppInfoLocalization(args as any));
+
+          case "update_app_info_localization":
+            return formatResponse(await this.localizationHandlers.updateAppInfoLocalization(args as any));
+
           // Bundle IDs
           case "create_bundle_id":
             return formatResponse(await this.bundleHandlers.createBundleId(args as any));
@@ -1060,6 +1183,9 @@ class AppStoreConnectServer {
           // Analytics & Reports
           case "create_analytics_report_request":
             return formatResponse(await this.analyticsHandlers.createAnalyticsReportRequest(args as any));
+
+          case "delete_analytics_report_request":
+            return formatResponse(await this.analyticsHandlers.deleteAnalyticsReportRequest(args as any));
 
           case "list_analytics_report_requests":
             return formatResponse(await this.analyticsHandlers.listAnalyticsReportRequests(args as any));
