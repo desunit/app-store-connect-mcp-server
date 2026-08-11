@@ -444,6 +444,92 @@ class AppStoreConnectServer {
           }
         },
 
+        // App Info Localization Tools (app name + subtitle)
+        {
+          name: "list_app_infos",
+          description: "List the appInfo records for an app. An appInfo holds the name/subtitle localizations and the age ratings; an app usually has one, but can have a live record plus an editable draft.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              appId: {
+                type: "string",
+                description: "The ID of the app"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of appInfos to return (default: 100)",
+                minimum: 1,
+                maximum: 200
+              }
+            },
+            required: ["appId"]
+          }
+        },
+        {
+          name: "list_app_info_localizations",
+          description: "Get the app NAME and SUBTITLE per locale, plus privacy URLs. These do not live on appStoreVersionLocalizations (which carries description/keywords/whatsNew). Apple indexes name + subtitle + keywords together for search, so read this before editing a keyword field to avoid spending characters on words the name or subtitle already covers.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              appId: {
+                type: "string",
+                description: "The ID of the app. Resolves to its appInfo automatically, preferring the editable draft over the live record; the choice is reported back in meta.appInfo. Use this unless you already have an appInfoId."
+              },
+              appInfoId: {
+                type: "string",
+                description: "The ID of a specific appInfo (from list_app_infos). Takes precedence over appId."
+              },
+              locale: {
+                type: "string",
+                description: "Optional locale filter (e.g. 'en-US', 'de-DE', 'ja')"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of localizations to return (default: 100)",
+                minimum: 1,
+                maximum: 200
+              }
+            }
+          }
+        },
+        {
+          name: "get_app_info_localization",
+          description: "Get a single app info localization (name, subtitle, privacy URLs) by its ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              localizationId: {
+                type: "string",
+                description: "The ID of the app info localization"
+              }
+            },
+            required: ["localizationId"]
+          }
+        },
+        {
+          name: "update_app_info_localization",
+          description: "Update the app name, subtitle or a privacy URL for one locale. Name and subtitle are capped at 30 characters each and are validated before the request is sent. Only an editable appInfo accepts changes — a record in READY_FOR_DISTRIBUTION is rejected by Apple.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              localizationId: {
+                type: "string",
+                description: "The ID of the app info localization to update"
+              },
+              field: {
+                type: "string",
+                enum: ["name", "subtitle", "privacyPolicyUrl", "privacyChoicesUrl", "privacyPolicyText"],
+                description: "The field to update"
+              },
+              value: {
+                type: "string",
+                description: "The new value for the field (name and subtitle: 30 characters maximum)"
+              }
+            },
+            required: ["localizationId", "field", "value"]
+          }
+        },
+
         // Bundle ID Tools
         {
           name: "create_bundle_id",
@@ -1056,6 +1142,19 @@ class AppStoreConnectServer {
           
           case "update_app_store_version_localization":
             return formatResponse(await this.localizationHandlers.updateAppStoreVersionLocalization(args as any));
+
+          // App Info Localizations (name + subtitle)
+          case "list_app_infos":
+            return formatResponse(await this.localizationHandlers.listAppInfos(args as any));
+
+          case "list_app_info_localizations":
+            return formatResponse(await this.localizationHandlers.listAppInfoLocalizations(args as any));
+
+          case "get_app_info_localization":
+            return formatResponse(await this.localizationHandlers.getAppInfoLocalization(args as any));
+
+          case "update_app_info_localization":
+            return formatResponse(await this.localizationHandlers.updateAppInfoLocalization(args as any));
 
           // Bundle IDs
           case "create_bundle_id":
